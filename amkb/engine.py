@@ -1,6 +1,6 @@
-"""Silnik IBus: pokazuje podpowiedź AI jako szary tekst za kursorem, Tab ją wstawia.
+"""IBus engine: shows an AI suggestion as gray text after the cursor, Tab inserts it.
 
-Uruchamiany przez ibus-daemon (z flagą --ibus) albo ręcznie do testów.
+Started by ibus-daemon (with the --ibus flag).
 """
 
 import logging
@@ -46,7 +46,7 @@ _PRIVATE_HINT = getattr(IBus.InputHints, "PRIVATE", 0)
 
 
 class Settings:
-    """Konfiguracja przeładowywana automatycznie po zmianie pliku (amkb config ...)."""
+    """Configuration reloaded automatically when the file changes (amkb config ...)."""
 
     def __init__(self):
         self._mtime = -1.0
@@ -70,7 +70,7 @@ class AMKBEngine(IBus.Engine):
     def __init__(self, bus: IBus.Bus, object_path: str):
         super().__init__(connection=bus.get_connection(), object_path=object_path)
         self._suggestion = ""
-        self._buffer = ""          # zapasowy kontekst, gdy aplikacja nie podaje surrounding text
+        self._buffer = ""          # fallback context when the app provides no surrounding text
         self._timer = 0
         self._req_id = 0
         self._focused = False
@@ -78,10 +78,10 @@ class AMKBEngine(IBus.Engine):
         self._caps = 0
         self._cache: OrderedDict[str, str] = OrderedDict()
 
-    # --- cykl życia ---------------------------------------------------------
+    # --- lifecycle ------------------------------------------------------------
 
     def do_enable(self):
-        self.get_surrounding_text()  # prosi aplikację o przysyłanie kontekstu
+        self.get_surrounding_text()  # asks the app to send surrounding text
 
     def do_disable(self):
         self._dismiss()
@@ -109,12 +109,12 @@ class AMKBEngine(IBus.Engine):
         if self._blocked:
             self._dismiss()
 
-    # --- klawisze -----------------------------------------------------------
+    # --- keys --------------------------------------------------------------
 
     def do_process_key_event(self, keyval, keycode, state):
         if state & _M.RELEASE_MASK:
             return False
-        self._focused = True  # klawisze trafiają tylko do kontekstu z fokusem
+        self._focused = True  # keys only reach the focused context
         if self._blocked:
             return False
 
@@ -165,7 +165,7 @@ class AMKBEngine(IBus.Engine):
         ch = ch[0]
         self._buffer = (self._buffer + ch)[-4000:]
 
-        # Użytkownik pisze dokładnie to, co podpowiadamy – przesuwamy podpowiedź bez nowego zapytania.
+        # The user types exactly what we suggest – advance the suggestion without a new request.
         if self._suggestion and self._suggestion.startswith(ch):
             rest = self._suggestion[1:]
             self._hide()
@@ -181,7 +181,7 @@ class AMKBEngine(IBus.Engine):
         self._schedule()
         return False
 
-    # --- podpowiedzi --------------------------------------------------------
+    # --- suggestions -----------------------------------------------------------
 
     def _accept(self, text: str):
         rest = self._suggestion[len(text):]
@@ -211,7 +211,7 @@ class AMKBEngine(IBus.Engine):
         attrs.append(IBus.Attribute.new(IBus.AttrType.FOREGROUND, GHOST_COLOR, 0, n))
         attrs.append(IBus.Attribute.new(IBus.AttrType.UNDERLINE, IBus.AttrUnderline.NONE, 0, n))
         ibus_text.set_attributes(attrs)
-        # kursor na początku – karetka zostaje za tym, co wpisał użytkownik
+        # cursor at 0 – the caret stays right after what the user typed
         self.update_preedit_text_with_mode(ibus_text, 0, True, IBus.PreeditFocusMode.CLEAR)
 
     def _hide(self):
@@ -245,7 +245,7 @@ class AMKBEngine(IBus.Engine):
                 s, cursor, anchor = "", 0, 0
             if s:
                 if anchor != cursor:
-                    return None  # zaznaczenie – nie podpowiadamy
+                    return None  # selection – no suggestion
                 return s[:cursor], s[cursor:]
         return self._buffer, ""
 
@@ -261,7 +261,7 @@ class AMKBEngine(IBus.Engine):
         before = before[-int(cfg.get("context_chars") or 1500):]
         if len(before.strip()) < int(cfg.get("min_chars") or 3):
             return False
-        # Podpowiadamy tylko na końcu linii.
+        # Suggest only at the end of a line.
         if after.split("\n", 1)[0].strip():
             return False
 
@@ -304,14 +304,14 @@ class Daemon:
         IBus.init()
         self.bus = IBus.Bus()
         if not self.bus.is_connected():
-            sys.exit("Nie mogę połączyć się z IBus (czy ibus-daemon działa?)")
+            sys.exit("Cannot connect to IBus (is ibus-daemon running?)")
         self.mainloop = GLib.MainLoop()
         self.bus.connect("disconnected", lambda *_: self.mainloop.quit())
         self.engines = []
         self.counter = 0
         self.factory = IBus.Factory.new(self.bus.get_connection())
         self.factory.connect("create-engine", self._create_engine)
-        # Silnik jest opisany w /usr/share/ibus/component/amkb.xml i uruchamiany przez ibus-daemon.
+        # The engine is described in /usr/share/ibus/component/amkb.xml and started by ibus-daemon.
         self.bus.request_name(BUS_NAME, 0)
 
     def _create_engine(self, factory, engine_name):

@@ -4,4 +4,4 @@ set -euo pipefail
 sudo rm -f /usr/share/ibus/component/amkb.xml
 rm -rf "$HOME/.local/share/amkb" "$HOME/.local/bin/amkb"
 ibus restart >/dev/null 2>&1 || true
-echo "Odinstalowano. Konfiguracja (z kluczem API) zostaje w ~/.config/amkb – usuń ją ręcznie, jeśli chcesz."
+echo "Uninstalled. Configuration (including the API key) stays in ~/.config/amkb – delete it manually if you want."

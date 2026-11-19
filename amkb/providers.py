@@ -1,4 +1,4 @@
-"""Dostawcy modeli AI. Każdy zwraca krótkie dokończenie tekstu przed kursorem."""
+"""AI model providers. Each returns a short continuation of the text before the cursor."""
 
 import json
 import re
@@ -56,21 +56,21 @@ PROVIDERS = {
         "needs_key": True,
     },
     "ollama": {
-        "label": "Ollama (lokalnie, bez klucza)",
+        "label": "Ollama (local, no key)",
         "kind": "openai",
         "base_url": "http://localhost:11434/v1",
         "model": "llama3.2",
         "needs_key": False,
     },
     "custom": {
-        "label": "Własny endpoint zgodny z OpenAI (--base-url)",
+        "label": "Custom OpenAI-compatible endpoint (--base-url)",
         "kind": "openai",
         "base_url": None,
         "model": None,
         "needs_key": False,
     },
     "mock": {
-        "label": "Testowy (bez sieci, zawsze podpowiada to samo)",
+        "label": "Test provider (offline, always suggests the same text)",
         "kind": "mock",
         "base_url": None,
         "model": "mock",
@@ -78,7 +78,7 @@ PROVIDERS = {
     },
 }
 
-# Modele Anthropic obsługujące serwerowy fallback po odmowie.
+# Anthropic models that support server-side fallback after a refusal.
 _ANTHROPIC_FALLBACK_MODELS = {
     "claude-fable-5-2", "claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5",
 }
@@ -104,16 +104,16 @@ class ProviderError(Exception):
 def resolve(cfg: dict) -> tuple[dict, str, str | None]:
     name = cfg.get("provider")
     if name not in PROVIDERS:
-        raise ProviderError("Brak dostawcy. Ustaw go: amkb config -p <dostawca> -k <klucz>")
+        raise ProviderError("No provider set. Set one with: amkb config -p <provider> -k <key>")
     spec = PROVIDERS[name]
     model = cfg.get("model") or spec["model"]
     base_url = cfg.get("base_url") or spec["base_url"]
     if not model:
-        raise ProviderError(f"Dostawca '{name}' wymaga --model")
+        raise ProviderError(f"Provider '{name}' requires --model")
     if spec["kind"] == "openai" and not base_url:
-        raise ProviderError(f"Dostawca '{name}' wymaga --base-url")
+        raise ProviderError(f"Provider '{name}' requires --base-url")
     if spec["needs_key"] and not cfg.get("api_key"):
-        raise ProviderError(f"Dostawca '{name}' wymaga klucza API (-k)")
+        raise ProviderError(f"Provider '{name}' requires an API key (-k)")
     return spec, model, base_url
 
 
@@ -122,7 +122,7 @@ def build_user_message(before: str, after: str) -> str:
 
 
 def complete(cfg: dict, before: str, after: str = "") -> str:
-    """Zwraca oczyszczone dokończenie (może być puste)."""
+    """Returns a cleaned-up continuation (may be empty)."""
     spec, model, base_url = resolve(cfg)
     system = SYSTEM_PROMPT.format(max_words=int(cfg.get("max_words") or 8))
     user = build_user_message(before, after)
@@ -135,13 +135,13 @@ def complete(cfg: dict, before: str, after: str = "") -> str:
     elif kind == "gemini":
         raw = _gemini(base_url, cfg["api_key"], model, system, user, timeout)
     elif kind == "mock":
-        raw = " to jest testowa podpowiedź"
+        raw = " this is a test suggestion"
     else:
-        raise ProviderError(f"Nieznany typ dostawcy: {kind}")
+        raise ProviderError(f"Unknown provider type: {kind}")
     return clean_completion(before, raw, int(cfg.get("max_words") or 8))
 
 
-# --- implementacje -----------------------------------------------------------
+# --- implementations -----------------------------------------------------------
 
 def _post_json(url: str, headers: dict, body: dict, timeout: float) -> dict:
     data = json.dumps(body).encode("utf-8")
@@ -157,7 +157,7 @@ def _post_json(url: str, headers: dict, body: dict, timeout: float) -> dict:
         detail = e.read().decode("utf-8", "replace")[:500]
         raise ProviderError(f"HTTP {e.code}: {detail}") from None
     except urllib.error.URLError as e:
-        raise ProviderError(f"Błąd połączenia: {e.reason}") from None
+        raise ProviderError(f"Connection error: {e.reason}") from None
 
 
 def _openai(base_url, api_key, model, system, user, timeout) -> str:
@@ -176,7 +176,7 @@ def _openai(base_url, api_key, model, system, user, timeout) -> str:
     try:
         return data["choices"][0]["message"]["content"] or ""
     except (KeyError, IndexError, TypeError):
-        raise ProviderError(f"Nieoczekiwana odpowiedź: {str(data)[:300]}") from None
+        raise ProviderError(f"Unexpected response: {str(data)[:300]}") from None
 
 
 _anthropic_clients: dict = {}
@@ -186,7 +186,7 @@ def _anthropic(api_key, model, system, user, timeout) -> str:
     try:
         import anthropic
     except ImportError:
-        raise ProviderError("Brak pakietu 'anthropic' – uruchom ponownie ./install.sh") from None
+        raise ProviderError("Package 'anthropic' missing – re-run ./install.sh") from None
 
     client = _anthropic_clients.get(api_key)
     if client is None:
@@ -209,15 +209,15 @@ def _anthropic(api_key, model, system, user, timeout) -> str:
         else:
             response = client.messages.create(**kwargs)
     except anthropic.AuthenticationError:
-        raise ProviderError("Anthropic: nieprawidłowy klucz API") from None
+        raise ProviderError("Anthropic: invalid API key") from None
     except anthropic.NotFoundError:
-        raise ProviderError(f"Anthropic: nie znaleziono modelu '{model}'") from None
+        raise ProviderError(f"Anthropic: model '{model}' not found") from None
     except anthropic.RateLimitError:
-        raise ProviderError("Anthropic: przekroczony limit zapytań") from None
+        raise ProviderError("Anthropic: rate limit exceeded") from None
     except anthropic.APIStatusError as e:
         raise ProviderError(f"Anthropic HTTP {e.status_code}: {e.message}") from None
     except anthropic.APIConnectionError:
-        raise ProviderError("Anthropic: błąd połączenia") from None
+        raise ProviderError("Anthropic: connection error") from None
 
     if response.stop_reason == "refusal":
         return ""
@@ -243,34 +243,33 @@ def _gemini(base_url, api_key, model, system, user, timeout) -> str:
         return ""
 
 
-# --- czyszczenie odpowiedzi --------------------------------------------------
+# --- response cleanup --------------------------------------------------
 
 def clean_completion(before: str, raw: str, max_words: int = 8) -> str:
     if not raw:
         return ""
     text = raw.replace("\r", "").replace("<CURSOR>", "")
-    # Model czasem zaczyna od nowej linii – bierzemy pierwszą niepustą linię tylko,
-    # jeśli odpowiedź nie zaczyna się od \n (wtedy nic nie podpowiadamy).
+    # If the model starts with a newline, suggest nothing; otherwise keep the first line.
     if text.startswith("\n"):
         return ""
     text = text.split("\n", 1)[0]
-    # Zdejmij cudzysłowy/backticki otaczające całość.
+    # Strip quotes/backticks wrapping the whole text.
     for q in ('"', "'", "`", "„", "”", "«"):
         if len(text) > 2 and text.startswith(q) and text.endswith(q if q != "„" else "”"):
             text = text[1:-1]
     text = text.rstrip()
 
-    # Jeśli model powtórzył początek niedokończonego słowa – utnij go.
+    # If the model repeated the start of an unfinished word, cut it off.
     m = re.search(r"(\S+)$", before)
     partial = m.group(1) if m else ""
     if partial and len(partial) >= 2 and text.lower().startswith(partial.lower()) and len(text) > len(partial):
         text = text[len(partial):]
 
-    # Podwójne spacje na styku.
+    # Avoid a double space at the join.
     if before.endswith((" ", "\t", "\n")) or not before:
         text = text.lstrip()
 
-    # Limit słów.
+    # Word limit.
     words = re.findall(r"\s*\S+", text)
     if len(words) > max_words:
         text = "".join(words[:max_words])

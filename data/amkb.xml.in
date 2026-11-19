@@ -18,7 +18,7 @@
       <layout>@LAYOUT@</layout>
       <layout_variant>@VARIANT@</layout_variant>
       <longname>Amazing Keyboard (AI)</longname>
-      <description>Podpowiedzi AI na szaro, Tab wstawia</description>
+      <description>Gray AI suggestions, Tab inserts</description>
       <rank>0</rank>
       <symbol>AI</symbol>
     </engine>

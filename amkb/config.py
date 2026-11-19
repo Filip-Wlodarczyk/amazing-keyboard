@@ -1,4 +1,4 @@
-"""Konfiguracja przechowywana w ~/.config/amkb/config.json (uprawnienia 600)."""
+"""Configuration stored in ~/.config/amkb/config.json (permissions 600)."""
 
 import json
 import os
@@ -13,16 +13,16 @@ LOG_FILE = CACHE_DIR / "engine.log"
 DEFAULTS = {
     "provider": None,
     "api_key": None,
-    "model": None,          # None = domyślny model dostawcy
-    "base_url": None,       # None = domyślny adres dostawcy
+    "model": None,          # None = provider's default model
+    "base_url": None,       # None = provider's default URL
     "enabled": True,
-    "debounce_ms": 400,     # ile ms po ostatnim klawiszu wysłać zapytanie
-    "min_chars": 3,         # minimalna długość kontekstu
-    "max_words": 8,         # maksymalna długość podpowiedzi
-    "context_chars": 1500,  # ile znaków przed kursorem wysłać do modelu
-    "display": "inline",    # inline = szary tekst w polu, popup = okienko przy kursorze
+    "debounce_ms": 400,     # ms after the last keystroke before sending a request
+    "min_chars": 3,         # minimum context length
+    "max_words": 8,         # maximum suggestion length
+    "context_chars": 1500,  # how many chars before the cursor to send
+    "display": "inline",    # inline = gray text in the field, popup = box near the cursor
     "timeout_s": 15,
-    "debug": False,         # loguje treść zapytań – tylko do diagnostyki
+    "debug": False,         # logs request text – for diagnostics only
 }
 
 

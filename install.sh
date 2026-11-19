@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalacja Amazing Keyboard (amkb). Jedyny krok z sudo: skopiowanie pliku komponentu IBus.
+# Installs Amazing Keyboard (amkb). The only sudo step: copying the IBus component file.
 set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -7,13 +7,13 @@ PREFIX="$HOME/.local/share/amkb"
 BIN="$HOME/.local/bin"
 COMPONENT_DIR="/usr/share/ibus/component"
 
-echo "==> Kopiuję pliki do $PREFIX"
+echo "==> Copying files to $PREFIX"
 mkdir -p "$PREFIX/bin" "$BIN"
 rm -rf "$PREFIX/amkb"
 cp -r "$SRC/amkb" "$PREFIX/amkb"
 find "$PREFIX/amkb" -name '__pycache__' -prune -exec rm -rf {} +
 
-echo "==> Tworzę środowisko Pythona (z dostępem do systemowego gi/IBus)"
+echo "==> Creating Python environment (with access to system gi/IBus)"
 if [ ! -x "$PREFIX/venv/bin/python" ]; then
     python3 -m venv --system-site-packages "$PREFIX/venv"
 fi
@@ -31,7 +31,7 @@ exec "$PREFIX/venv/bin/python" -m amkb.cli "\$@"
 EOF
 chmod +x "$PREFIX/bin/amkb-engine" "$BIN/amkb"
 
-# Układ klawiatury = pierwszy układ xkb z GNOME (np. 'pl'), żeby litery się nie zmieniły.
+# Keyboard layout = first xkb layout from GNOME (e.g. 'us'), so your letters stay the same.
 LAYOUT="$(python3 - <<'PY'
 import ast, subprocess
 try:
@@ -50,7 +50,7 @@ PY
 LAYOUT_NAME="${LAYOUT%%+*}"
 VARIANT=""
 [[ "$LAYOUT" == *+* ]] && VARIANT="${LAYOUT#*+}"
-echo "==> Układ klawiatury: $LAYOUT_NAME ${VARIANT:+(wariant $VARIANT)}"
+echo "==> Keyboard layout: $LAYOUT_NAME ${VARIANT:+(variant $VARIANT)}"
 
 sed -e "s|@EXEC@|$PREFIX/bin/amkb-engine --ibus|" \
     -e "s|@LAYOUT@|$LAYOUT_NAME|" \
@@ -58,26 +58,26 @@ sed -e "s|@EXEC@|$PREFIX/bin/amkb-engine --ibus|" \
     "$SRC/data/amkb.xml.in" > "$PREFIX/amkb.xml"
 
 if [ "${AMKB_SKIP_SYSTEM:-0}" = "1" ]; then
-    echo "==> Pomijam krok systemowy. Wykonaj jako root:"
+    echo "==> Skipping the system step. Run as root:"
     echo "    install -m 644 $PREFIX/amkb.xml $COMPONENT_DIR/amkb.xml && ibus restart"
     exit 0
 fi
-echo "==> Rejestruję silnik w IBus (wymaga sudo)"
+echo "==> Registering the engine with IBus (needs sudo)"
 sudo install -m 644 "$PREFIX/amkb.xml" "$COMPONENT_DIR/amkb.xml"
 
-echo "==> Restart IBus"
+echo "==> Restarting IBus"
 ibus restart >/dev/null 2>&1 || true
 sleep 2
 
 case ":$PATH:" in
     *":$BIN:"*) ;;
-    *) echo "UWAGA: dodaj $BIN do PATH (np. otwórz nowy terminal)";;
+    *) echo "NOTE: add $BIN to PATH (e.g. open a new terminal)";;
 esac
 
 cat <<EOF
 
-Gotowe! Dalej:
-  amkb config -p openai            # wybierz dostawcę, klucz wpiszesz niewidocznie
-  amkb test                        # sprawdź czy działa
-  amkb activate                    # włącz w systemie (Super+Spacja przełącza)
+Done! Next:
+  amkb config -p openai            # choose a provider, type the key hidden
+  amkb test                        # check that it works
+  amkb activate                    # enable system-wide (Super+Space switches)
 EOF

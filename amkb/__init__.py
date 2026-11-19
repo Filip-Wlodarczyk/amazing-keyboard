@@ -1,3 +1,3 @@
-"""Amazing Keyboard – systemowe podpowiedzi AI (ghost text) dla Ubuntu przez IBus."""
+"""Amazing Keyboard – system-wide AI suggestions (ghost text) for Ubuntu via IBus."""
 
 __version__ = "0.1.0"
